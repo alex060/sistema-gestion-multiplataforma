@@ -38,7 +38,7 @@ export const useRegisterForm = () => {
   const [emailAsyncMessage, setEmailAsyncMessage] = useState<string | null>(null);
 
   // Referencia para cancelar llamadas pendientes de debounce
-  const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const handleChange = useCallback((field: keyof RegisterFormState, value: any) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
