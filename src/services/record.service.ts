@@ -159,6 +159,30 @@ class RecordService {
 
     return res.data;
   }
+
+  /**
+   * Actualizar el estado de un registro empresarial (Aprobar / Rechazar)
+   */
+  public async updateRecordStatus(
+    id: string,
+    status: 'APROBADO' | 'EN_REVISION' | 'RECHAZADO'
+  ): Promise<EnterpriseRecord | null> {
+    const res = await apiService.simulateRequest(() => {
+      const idx = this.records.findIndex((r) => r.id === id);
+      if (idx === -1) {
+        throw new ApiError(404, 'Expediente no encontrado');
+      }
+      this.records[idx] = {
+        ...this.records[idx],
+        status,
+        updatedAt: new Date().toISOString()
+      };
+      this.saveRecords();
+      return this.records[idx];
+    }, 300, true);
+
+    return res.data;
+  }
 }
 
 export const recordService = new RecordService();

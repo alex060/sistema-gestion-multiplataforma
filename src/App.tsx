@@ -35,6 +35,7 @@ const DashboardPage = React.lazy(() => import('./pages/dashboard/DashboardPage')
 const RecordsListPage = React.lazy(() => import('./pages/records/RecordsListPage'));
 const NewRecordPage = React.lazy(() => import('./pages/records/NewRecordPage'));
 const UserManagementPage = React.lazy(() => import('./pages/admin/UserManagementPage'));
+const HelpPage = React.lazy(() => import('./pages/help/HelpPage'));
 const UnauthorizedPage = React.lazy(() => import('./pages/common/UnauthorizedPage'));
 const NotFoundPage = React.lazy(() => import('./pages/common/NotFoundPage'));
 
@@ -93,6 +94,9 @@ const AppRoutes: React.FC = () => {
               roles={['ADMIN']}
               component={UserManagementPage}
             />
+
+            {/* Centro de Ayuda y Manual de Usuario Integrado (Fase 5 - RA 6) */}
+            <ProtectedRoute exact path="/help" component={HelpPage} />
 
             {/* Errores y Redirecciones */}
             <Route exact path="/unauthorized" component={UnauthorizedPage} />

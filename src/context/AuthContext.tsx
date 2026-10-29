@@ -31,6 +31,55 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // Inicialización de sesión persistida
   useEffect(() => {
     try {
+      const urlParams = new URLSearchParams(window.location.search);
+      const demoRole = urlParams.get('demo');
+
+      if (demoRole === 'admin') {
+        const adminUser: User = {
+          id: 'usr-admin-001',
+          name: 'Carlos Mendoza (Admin)',
+          email: 'admin@empresa.com',
+          role: 'ADMIN',
+          createdAt: '2026-01-15T09:00:00.000Z',
+          avatarUrl: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&auto=format&fit=crop&q=80'
+        };
+        const token: AuthToken = {
+          accessToken: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ1c3ItYWRtaW4tMDAxIiwibmFtZSI6IkNhcmxvcyBNZW5kb3phIiwicm9sZSI6IkFETUlOIiwiaWF0IjoxNzAwMDAwMDAwfQ.simulated_signature',
+          expiresIn: 3600,
+          tokenType: 'Bearer',
+          issuedAt: Date.now()
+        };
+        setUser(adminUser);
+        setToken(token);
+        localStorage.setItem('nexus_erp_user', JSON.stringify(adminUser));
+        localStorage.setItem('nexus_erp_token', JSON.stringify(token));
+        setIsLoading(false);
+        return;
+      }
+
+      if (demoRole === 'standard') {
+        const stdUser: User = {
+          id: 'usr-std-002',
+          name: 'Lucía Fernández (Estándar)',
+          email: 'user@empresa.com',
+          role: 'STANDARD',
+          createdAt: '2026-02-10T11:30:00.000Z',
+          avatarUrl: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150&auto=format&fit=crop&q=80'
+        };
+        const token: AuthToken = {
+          accessToken: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ1c3Itc3RkLTAwMiIsIm5hbWUiOiJMdWPDrWEgRmVybsOhbmRleiIsInJvbGUiOiJTVEFOREFSRCIsImlhdCI6MTcwMDAwMDAwMH0.simulated_signature',
+          expiresIn: 3600,
+          tokenType: 'Bearer',
+          issuedAt: Date.now()
+        };
+        setUser(stdUser);
+        setToken(token);
+        localStorage.setItem('nexus_erp_user', JSON.stringify(stdUser));
+        localStorage.setItem('nexus_erp_token', JSON.stringify(token));
+        setIsLoading(false);
+        return;
+      }
+
       const session = authService.getStoredSession();
       if (session.user && session.token) {
         setUser(session.user);

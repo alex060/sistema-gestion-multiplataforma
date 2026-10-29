@@ -1,61 +1,208 @@
 /**
  * Vista de Listado de Expedientes Empresariales
- * Muestra los registros existentes y permite navegar al formulario de alta.
+ * Fases 2 y 3: Integra el componente reutilizable AdvancedDataTable (RA 3),
+ * ordenación dinámica, búsqueda reactiva, paginación, exportación CSV/PDF y eventos NoSQL.
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
-  IonCard,
-  IonCardContent,
   IonButton,
   IonIcon,
   IonBadge,
-  IonItem,
-  IonList
+  IonAlert,
+  IonToast
 } from '@ionic/react';
-import { addCircleOutline, folderOutline, cashOutline, personCircleOutline } from 'ionicons/icons';
+import {
+  addCircleOutline,
+  checkmarkCircleOutline,
+  closeCircleOutline,
+  eyeOutline,
+  cashOutline
+} from 'ionicons/icons';
 import { MainLayout } from '../../components/layout/MainLayout';
 import { LoadingSpinner } from '../../components/common/LoadingSpinner';
+import { AdvancedDataTable, ColumnConfig } from '../../components/common/AdvancedDataTable';
 import { recordService } from '../../services/record.service';
+import { exportService } from '../../services/export.service';
+import { noSqlRealtimeService } from '../../services/noSqlRealtime.service';
+import { useAuth } from '../../context/AuthContext';
 import { EnterpriseRecord } from '../../models/record.model';
 
 export const RecordsListPage: React.FC = () => {
+  const { user, hasRole } = useAuth();
   const [records, setRecords] = useState<EnterpriseRecord[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [selectedRecord, setSelectedRecord] = useState<EnterpriseRecord | null>(null);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
 
-  useEffect(() => {
-    let active = true;
-    recordService.getAllRecords().then((data) => {
-      if (active) {
-        setRecords(data);
-        setIsLoading(false);
-      }
-    });
-    return () => {
-      active = false;
-    };
+  const fetchRecords = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      const data = await recordService.getAllRecords();
+      setRecords(data);
+    } catch (err) {
+      console.error('Error al cargar expedientes:', err);
+    } finally {
+      setIsLoading(false);
+    }
   }, []);
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'APROBADO': return 'success';
-      case 'EN_REVISION': return 'warning';
-      case 'RECHAZADO': return 'danger';
-      default: return 'medium';
+  useEffect(() => {
+    fetchRecords();
+  }, [fetchRecords]);
+
+  // Manejo de cambio de estado de expediente (Solo Admin)
+  const handleUpdateStatus = async (record: EnterpriseRecord, newStatus: 'APROBADO' | 'RECHAZADO') => {
+    try {
+      const updated = await recordService.updateRecordStatus(record.id, newStatus);
+      if (updated) {
+        setRecords((prev) => prev.map((r) => (r.id === record.id ? updated : r)));
+        setToastMessage(`Expediente ${record.code} actualizado a ${newStatus}.`);
+
+        // Emitir evento al stream NoSQL en tiempo real
+        noSqlRealtimeService.emitDocumentEvent(
+          'STATUS_CHANGE',
+          `Estado Actualizado: ${record.code}`,
+          `El expediente "${record.title}" ha sido marcado como ${newStatus} por ${user?.name}.`,
+          newStatus === 'APROBADO' ? 'high' : 'medium'
+        );
+      }
+    } catch (err) {
+      console.error('Error al actualizar estado:', err);
     }
   };
 
-  return (
-    <MainLayout title="Expedientes Empresariales">
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '0.75rem' }}>
+  const getStatusBadge = (status: string) => {
+    switch (status) {
+      case 'APROBADO':
+        return <IonBadge color="success">APROBADO</IonBadge>;
+      case 'EN_REVISION':
+        return <IonBadge color="warning">EN REVISIÓN</IonBadge>;
+      case 'RECHAZADO':
+        return <IonBadge color="danger">RECHAZADO</IonBadge>;
+      default:
+        return <IonBadge color="medium">{status}</IonBadge>;
+    }
+  };
+
+  // Configuración de Columnas para el componente agnóstico AdvancedDataTable
+  const columns: ColumnConfig<EnterpriseRecord>[] = [
+    {
+      key: 'code',
+      header: 'Código',
+      sortable: true,
+      width: '130px',
+      render: (r) => (
+        <span
+          style={{
+            background: '#0f172a',
+            color: '#ffffff',
+            padding: '0.2rem 0.5rem',
+            borderRadius: '4px',
+            fontFamily: 'monospace',
+            fontWeight: 700,
+            fontSize: '0.8rem'
+          }}
+        >
+          {r.code}
+        </span>
+      )
+    },
+    {
+      key: 'title',
+      header: 'Título y Descripción',
+      sortable: true,
+      render: (r) => (
         <div>
-          <h2 style={{ margin: 0, fontSize: '1.4rem', fontWeight: 700, color: '#0f172a' }}>
-            Registro de Operaciones
+          <strong style={{ color: '#0f172a', fontSize: '0.9rem', display: 'block' }}>{r.title}</strong>
+          <span style={{ color: '#64748b', fontSize: '0.8rem' }}>{r.description}</span>
+        </div>
+      )
+    },
+    {
+      key: 'category',
+      header: 'Departamento / Cat.',
+      sortable: true,
+      width: '160px',
+      render: (r) => <IonBadge color="tertiary">{r.category}</IonBadge>
+    },
+    {
+      key: 'budget',
+      header: 'Presupuesto',
+      sortable: true,
+      align: 'right',
+      width: '140px',
+      render: (r) => (
+        <span style={{ fontWeight: 700, color: '#15803d', display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}>
+          <IonIcon icon={cashOutline} />
+          {r.budget.toLocaleString('es-ES')} €
+        </span>
+      )
+    },
+    {
+      key: 'status',
+      header: 'Estado',
+      sortable: true,
+      align: 'center',
+      width: '130px',
+      render: (r) => getStatusBadge(r.status)
+    },
+    {
+      key: 'createdByName',
+      header: 'Responsable',
+      sortable: true,
+      width: '150px',
+      render: (r) => <span style={{ fontSize: '0.85rem', color: '#475569' }}>{r.createdByName}</span>
+    }
+  ];
+
+  // Exportaciones
+  const handleExportCSV = (dataToExport: EnterpriseRecord[]) => {
+    exportService.exportToCSV(
+      'Listado_Expedientes_Empresariales',
+      dataToExport,
+      [
+        { key: 'code', header: 'Código' },
+        { key: 'title', header: 'Título' },
+        { key: 'category', header: 'Categoría' },
+        { key: 'budget', header: 'Presupuesto (€)' },
+        { key: 'status', header: 'Estado' },
+        { key: 'createdByName', header: 'Responsable' },
+        { key: 'createdAt', header: 'Fecha de Alta' }
+      ]
+    );
+  };
+
+  const handleExportPDF = (dataToExport: EnterpriseRecord[]) => {
+    exportService.exportRecordsToPDF(
+      'Informe Detallado de Expedientes Corporativos',
+      dataToExport,
+      { name: user?.name || 'Usuario', role: user?.role || 'ESTÁNDAR' }
+    );
+  };
+
+  return (
+    <MainLayout title="Expedientes Corporativos">
+      {/* Encabezado y botón de alta */}
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          marginBottom: '1.25rem',
+          flexWrap: 'wrap',
+          gap: '0.75rem'
+        }}
+      >
+        <div>
+          <h2 style={{ margin: 0, fontSize: '1.4rem', fontWeight: 800, color: '#0f172a' }}>
+            Registro de Operaciones Corporativas
           </h2>
-          <p style={{ margin: 0, color: '#64748b', fontSize: '0.875rem' }}>
-            Listado consolidado de expedientes y contratos registrados en la plataforma.
+          <p style={{ margin: '0.25rem 0 0 0', color: '#64748b', fontSize: '0.875rem' }}>
+            Visualización avanzada, búsqueda multi-campo, paginación dinámica y auditoría de estado.
           </p>
         </div>
+
         <IonButton routerLink="/records/new" style={{ fontWeight: 600 }}>
           <IonIcon slot="start" icon={addCircleOutline} />
           Nuevo Expediente
@@ -63,69 +210,93 @@ export const RecordsListPage: React.FC = () => {
       </div>
 
       {isLoading ? (
-        <LoadingSpinner message="Cargando expedientes desde el servicio..." />
-      ) : records.length === 0 ? (
-        <IonCard>
-          <IonCardContent style={{ textAlign: 'center', padding: '3rem' }}>
-            <IonIcon icon={folderOutline} style={{ fontSize: '48px', color: '#94a3b8' }} />
-            <h3 style={{ color: '#334155', fontWeight: 600, marginTop: '1rem' }}>No hay expedientes registrados</h3>
-            <p style={{ color: '#64748b' }}>Utilice el botón de alta para registrar una nueva operación.</p>
-            <IonButton routerLink="/records/new" fill="outline">
-              Crear Primer Expediente
-            </IonButton>
-          </IonCardContent>
-        </IonCard>
+        <LoadingSpinner message="Cargando expedientes desde el repositorio relacional..." />
       ) : (
-        <IonList lines="full" style={{ borderRadius: '12px', overflow: 'hidden', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)' }}>
-          {records.map((rec) => (
-            <IonItem key={rec.id} style={{ '--padding-top': '1rem', '--padding-bottom': '1rem' }}>
-              <div style={{ width: '100%' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '0.5rem' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                    <span
-                      style={{
-                        background: '#0f172a',
-                        color: '#ffffff',
-                        padding: '0.2rem 0.5rem',
-                        borderRadius: '4px',
-                        fontFamily: 'monospace',
-                        fontWeight: 700,
-                        fontSize: '0.8rem'
-                      }}
-                    >
-                      {rec.code}
-                    </span>
-                    <IonBadge color="tertiary" style={{ fontSize: '0.75rem' }}>
-                      {rec.category}
-                    </IonBadge>
-                  </div>
-                  <IonBadge color={getStatusColor(rec.status)} style={{ fontSize: '0.75rem', textTransform: 'uppercase' }}>
-                    {rec.status.replace('_', ' ')}
-                  </IonBadge>
-                </div>
+        /* FASE 2: Integración de la Tabla de Datos Avanzada Reutilizable */
+        <AdvancedDataTable<EnterpriseRecord>
+          data={records}
+          columns={columns}
+          searchable
+          searchPlaceholder="Buscar por código, título, responsable..."
+          searchFields={['code', 'title', 'description', 'createdByName', 'category']}
+          filterCategoryKey="status"
+          filterCategories={[
+            { label: 'Aprobados', value: 'APROBADO' },
+            { label: 'En Revisión', value: 'EN_REVISION' },
+            { label: 'Rechazados', value: 'RECHAZADO' }
+          ]}
+          initialPageSize={5}
+          pageSizeOptions={[5, 10, 25]}
+          onExportCSV={handleExportCSV}
+          onExportPDF={handleExportPDF}
+          actions={(r) => (
+            <div style={{ display: 'flex', gap: '0.25rem', justifyContent: 'flex-end' }}>
+              <IonButton
+                size="small"
+                fill="clear"
+                color="primary"
+                onClick={() => setSelectedRecord(r)}
+                title="Ver detalle del expediente"
+                aria-label={`Ver detalles de ${r.code}`}
+              >
+                <IonIcon slot="icon-only" icon={eyeOutline} />
+              </IonButton>
 
-                <h3 style={{ margin: '0 0 0.4rem 0', fontSize: '1.05rem', fontWeight: 600, color: '#1e293b' }}>
-                  {rec.title}
-                </h3>
-                <p style={{ margin: '0 0 0.6rem 0', fontSize: '0.85rem', color: '#64748b', lineHeight: 1.4 }}>
-                  {rec.description}
-                </p>
-
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.8rem', color: '#64748b' }}>
-                  <span style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', color: '#15803d', fontWeight: 600 }}>
-                    <IonIcon icon={cashOutline} />
-                    {rec.budget.toLocaleString('es-ES')} €
-                  </span>
-                  <span style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
-                    <IonIcon icon={personCircleOutline} />
-                    Creado por {rec.createdByName}
-                  </span>
-                </div>
-              </div>
-            </IonItem>
-          ))}
-        </IonList>
+              {hasRole('ADMIN') && r.status === 'EN_REVISION' && (
+                <>
+                  <IonButton
+                    size="small"
+                    fill="clear"
+                    color="success"
+                    onClick={() => handleUpdateStatus(r, 'APROBADO')}
+                    title="Aprobar expediente"
+                    aria-label={`Aprobar expediente ${r.code}`}
+                  >
+                    <IonIcon slot="icon-only" icon={checkmarkCircleOutline} />
+                  </IonButton>
+                  <IonButton
+                    size="small"
+                    fill="clear"
+                    color="danger"
+                    onClick={() => handleUpdateStatus(r, 'RECHAZADO')}
+                    title="Rechazar expediente"
+                    aria-label={`Rechazar expediente ${r.code}`}
+                  >
+                    <IonIcon slot="icon-only" icon={closeCircleOutline} />
+                  </IonButton>
+                </>
+              )}
+            </div>
+          )}
+        />
       )}
+
+      {/* Modal / Alerta de Detalle de Expediente */}
+      {selectedRecord && (
+        <IonAlert
+          isOpen={!!selectedRecord}
+          header={`Detalle: ${selectedRecord.code}`}
+          subHeader={selectedRecord.title}
+          message={`
+            Categoría: ${selectedRecord.category}
+            Presupuesto: ${selectedRecord.budget.toLocaleString('es-ES')} €
+            Estado: ${selectedRecord.status}
+            Responsable: ${selectedRecord.createdByName}
+            Fecha: ${new Date(selectedRecord.createdAt).toLocaleString('es-ES')}
+            Descripción: ${selectedRecord.description}
+          `}
+          buttons={['Cerrar']}
+          onDidDismiss={() => setSelectedRecord(null)}
+        />
+      )}
+
+      <IonToast
+        isOpen={!!toastMessage}
+        message={toastMessage || ''}
+        duration={3000}
+        color="dark"
+        onDidDismiss={() => setToastMessage(null)}
+      />
     </MainLayout>
   );
 };
