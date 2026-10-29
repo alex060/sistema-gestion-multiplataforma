@@ -26,7 +26,8 @@ import {
   addCircleOutline,
   peopleOutline,
   logOutOutline,
-  shieldCheckmarkOutline
+  shieldCheckmarkOutline,
+  helpCircleOutline
 } from 'ionicons/icons';
 import { useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
@@ -60,6 +61,11 @@ const NAV_ITEMS: NavItem[] = [
     path: '/admin/users',
     icon: peopleOutline,
     adminOnly: true
+  },
+  {
+    title: 'Ayuda y Manual de Usuario',
+    path: '/help',
+    icon: helpCircleOutline
   }
 ];
 
