@@ -9,6 +9,8 @@ import { useHistory } from 'react-router-dom';
 import { CreateRecordDTO } from '../models/record.model';
 import { AsyncValidationStatus } from '../models/validation.model';
 import { recordService } from '../services/record.service';
+import { sqlApiService } from '../services/sqlApi.service';
+import { noSqlRealtimeService } from '../services/noSqlRealtime.service';
 import { useAuth } from '../context/AuthContext';
 
 export const useRecordForm = () => {
@@ -31,7 +33,7 @@ export const useRecordForm = () => {
   const [codeAsyncStatus, setCodeAsyncStatus] = useState<AsyncValidationStatus>('idle');
   const [codeAsyncMessage, setCodeAsyncMessage] = useState<string | null>(null);
 
-  const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const handleChange = useCallback((field: keyof CreateRecordDTO, value: any) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
@@ -144,7 +146,25 @@ export const useRecordForm = () => {
     setSubmitError(null);
 
     try {
-      await recordService.createRecord(formData, user.id, user.name);
+      const created = await recordService.createRecord(formData, user.id, user.name);
+
+      // Consumo dual: Log relacional SQL y emisión a stream NoSQL en tiempo real
+      await sqlApiService.logTransaction(
+        'INSERT_RECORD',
+        'EXPEDIENTE',
+        created.code,
+        { id: user.id, name: user.name },
+        `Alta de expediente "${created.title}" con presupuesto de ${created.budget} €.`
+      );
+
+      noSqlRealtimeService.emitDocumentEvent(
+        'NEW_RECORD',
+        `Nuevo Expediente Registrado: ${created.code}`,
+        `"${created.title}" creado por ${user.name} (${created.budget.toLocaleString('es-ES')} €).`,
+        'medium',
+        { code: created.code, budget: created.budget }
+      );
+
       history.push('/records');
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Error creando el expediente';
