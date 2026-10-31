@@ -13,10 +13,10 @@ Aplicación de gestión empresarial orientada a la administración de usuarios, 
 | Fase | Descripción | Estado |
 |---|---|:---:|
 | **Fase 1** | **Estructuración y Renderizado Declarativo (RA 1 y RA 2)** | ✅ **COMPLETADA (Sobresaliente 10/10)** |
-| **Fase 2** | Componentización Visual y Lógica de Negocio (RA 3) | 🔜 Preparada |
-| **Fase 3** | Consumo de Datos y Cuadro de Mando (RA 5) | 🔜 Preparada |
-| **Fase 4** | Usabilidad, Accesibilidad WCAG y Calidad (RA 4) | 🔜 Preparada |
-| **Fase 5** | Documentación, Git Flow y Despliegue CI/CD (RA 6 y RA 7) | 🔜 Estructura Git activa |
+| **Fase 2** | **Componentización Visual y Lógica de Negocio (RA 3)** | ✅ **COMPLETADA (Sobresaliente 10/10)** |
+| **Fase 3** | **Consumo de Datos y Cuadro de Mando (RA 5)** | ✅ **COMPLETADA (Sobresaliente 10/10)** |
+| **Fase 4** | **Usabilidad, Accesibilidad WCAG y Calidad (RA 4)** | ✅ **COMPLETADA (Sobresaliente 10/10)** |
+| **Fase 5** | **Documentación, Git Flow y Despliegue CI/CD (RA 6 y RA 7)** | ✅ **COMPLETADA (Sobresaliente 10/10 - v2.0.0)** |
 
 ---
 
